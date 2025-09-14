@@ -46,7 +46,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
             onClick={onClose}
             variant="ghost"
             size="sm"
-            className="rounded-full w-8 h-8 p-0 text-white hover:bg-white/10"
+            className="rounded-full w-8 h-8 p-0 text-white hover:bg-white/10 hover:text-white"
             aria-label="Close settings"
           >
             <X className="w-4 h-4" />
@@ -65,7 +65,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               max="60"
               value={settings.workTime}
               onChange={(e) => handleSettingChange("workTime", Number.parseInt(e.target.value) || 25)}
-              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40"
+              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40 focus:ring-white/20"
             />
           </div>
 
@@ -80,7 +80,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               max="30"
               value={settings.shortBreak}
               onChange={(e) => handleSettingChange("shortBreak", Number.parseInt(e.target.value) || 5)}
-              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40"
+              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40 focus:ring-white/20"
             />
           </div>
 
@@ -95,7 +95,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               max="60"
               value={settings.longBreak}
               onChange={(e) => handleSettingChange("longBreak", Number.parseInt(e.target.value) || 15)}
-              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40"
+              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40 focus:ring-white/20"
             />
           </div>
 
@@ -110,7 +110,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               max="8"
               value={settings.sessionsUntilLongBreak}
               onChange={(e) => handleSettingChange("sessionsUntilLongBreak", Number.parseInt(e.target.value) || 4)}
-              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40"
+              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40 focus:ring-white/20"
             />
           </div>
         </div>
@@ -118,14 +118,14 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
         <div className="flex gap-3 mt-8">
           <Button
             onClick={handleSave}
-            className="flex-1 bg-white/10 hover:bg-white/20 text-white rounded-lg backdrop-blur-sm border border-white/20 transition-all duration-300"
+            className="flex-1 bg-white/10 hover:bg-white/20 text-white rounded-lg backdrop-blur-sm border border-white/20 transition-all duration-300 focus:ring-white/20 focus:ring-2 focus:ring-offset-0"
           >
             Save & Reset
           </Button>
           <Button
             onClick={onClose}
             variant="outline"
-            className="flex-1 rounded-lg bg-white/5 hover:bg-white/10 border-white/20 text-white hover:text-white transition-all duration-300"
+            className="flex-1 rounded-lg bg-white/5 hover:bg-white/10 border-white/20 text-white hover:text-white transition-all duration-300 focus:ring-white/20 focus:ring-2 focus:ring-offset-0"
           >
             Cancel
           </Button>
