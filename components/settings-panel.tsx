@@ -38,15 +38,15 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900/95 backdrop-blur-md border border-white/10 p-6 rounded-2xl shadow-2xl max-w-md w-full">
+    <div className="fixed right-4 top-4 z-50">
+      <div className="bg-black border border-white/20 shadow-2xl p-6 rounded-xl w-[320px]">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white">Settings</h2>
           <Button
             onClick={onClose}
             variant="ghost"
             size="sm"
-            className="rounded-full w-8 h-8 p-0 text-white hover:bg-white/10 hover:text-white"
+            className="rounded-full w-8 h-8 p-0 text-white hover:bg-white/10"
             aria-label="Close settings"
           >
             <X className="w-4 h-4" />
@@ -55,7 +55,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
 
         <div className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="workTime" className="text-sm font-medium text-white">
+            <Label htmlFor="workTime" className="text-white">
               Work Time (minutes)
             </Label>
             <Input
@@ -65,12 +65,12 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               max="60"
               value={settings.workTime}
               onChange={(e) => handleSettingChange("workTime", Number.parseInt(e.target.value) || 25)}
-              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40 focus:ring-white/20"
+              className="bg-black/50 border-white/20 text-white focus:border-white/40 focus:ring-white/20"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="shortBreak" className="text-sm font-medium text-white">
+            <Label htmlFor="shortBreak" className="text-white">
               Short Break (minutes)
             </Label>
             <Input
@@ -80,12 +80,12 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               max="30"
               value={settings.shortBreak}
               onChange={(e) => handleSettingChange("shortBreak", Number.parseInt(e.target.value) || 5)}
-              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40 focus:ring-white/20"
+              className="bg-black/50 border-white/20 text-white focus:border-white/40 focus:ring-white/20"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="longBreak" className="text-sm font-medium text-white">
+            <Label htmlFor="longBreak" className="text-white">
               Long Break (minutes)
             </Label>
             <Input
@@ -95,12 +95,12 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               max="60"
               value={settings.longBreak}
               onChange={(e) => handleSettingChange("longBreak", Number.parseInt(e.target.value) || 15)}
-              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40 focus:ring-white/20"
+              className="bg-black/50 border-white/20 text-white focus:border-white/40 focus:ring-white/20"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sessions" className="text-sm font-medium text-white">
+            <Label htmlFor="sessions" className="text-white">
               Sessions Until Long Break
             </Label>
             <Input
@@ -110,7 +110,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               max="8"
               value={settings.sessionsUntilLongBreak}
               onChange={(e) => handleSettingChange("sessionsUntilLongBreak", Number.parseInt(e.target.value) || 4)}
-              className="rounded-lg bg-white/5 border-white/20 text-white placeholder:text-gray-400 focus:border-white/40 focus:ring-white/20"
+              className="bg-black/50 border-white/20 text-white focus:border-white/40 focus:ring-white/20"
             />
           </div>
         </div>
@@ -118,14 +118,15 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
         <div className="flex gap-3 mt-8">
           <Button
             onClick={handleSave}
-            className="flex-1 bg-white/10 hover:bg-white/20 text-white rounded-lg backdrop-blur-sm border border-white/20 transition-all duration-300 focus:ring-white/20 focus:ring-2 focus:ring-offset-0"
+            className="flex-1 bg-white/10 hover:bg-white/20 text-white"
+            variant="outline"
           >
             Save & Reset
           </Button>
           <Button
             onClick={onClose}
-            variant="outline"
-            className="flex-1 rounded-lg bg-white/5 hover:bg-white/10 border-white/20 text-white hover:text-white transition-all duration-300 focus:ring-white/20 focus:ring-2 focus:ring-offset-0"
+            variant="ghost"
+            className="flex-1 text-white hover:bg-white/10"
           >
             Cancel
           </Button>
