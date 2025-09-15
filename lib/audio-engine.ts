@@ -87,7 +87,7 @@ export class BinauralBeatEngine {
     }
 
     if (this.isPlaying()) {
-      this.stop();
+      this.stopInternal(true);
     }
 
     if (this.startToken !== token) {
@@ -178,21 +178,7 @@ export class BinauralBeatEngine {
 
   /** Stop playback and release oscillators. */
   public stop(): void {
-    BinauralBeatEngine.safelyStopOscillator(this.oscillators.left);
-    BinauralBeatEngine.safelyStopOscillator(this.oscillators.right);
-
-    BinauralBeatEngine.disconnectAudioNode(this.oscillators.left);
-    BinauralBeatEngine.disconnectAudioNode(this.oscillators.right);
-    BinauralBeatEngine.disconnectAudioNode(this.gains.left);
-    BinauralBeatEngine.disconnectAudioNode(this.gains.right);
-    BinauralBeatEngine.disconnectAudioNode(this.merger);
-    BinauralBeatEngine.disconnectAudioNode(this.masterGain);
-
-    this.oscillators = { left: null, right: null };
-    this.gains = { left: null, right: null };
-    this.merger = null;
-    this.masterGain = null;
-    this.startToken = null;
+    this.stopInternal(false);
   }
 
   /** Indicates whether the engine is currently playing a track. */
@@ -205,7 +191,7 @@ export class BinauralBeatEngine {
    * Useful when unmounting components to release browser resources.
    */
   public async destroy(): Promise<void> {
-    this.stop();
+    this.stopInternal(false);
 
     const ctx = this.context;
     if (ctx !== null) {
@@ -270,6 +256,27 @@ export class BinauralBeatEngine {
       if (!shouldIgnore) {
         throw error;
       }
+    }
+  }
+
+  private stopInternal(preserveToken: boolean): void {
+    BinauralBeatEngine.safelyStopOscillator(this.oscillators.left);
+    BinauralBeatEngine.safelyStopOscillator(this.oscillators.right);
+
+    BinauralBeatEngine.disconnectAudioNode(this.oscillators.left);
+    BinauralBeatEngine.disconnectAudioNode(this.oscillators.right);
+    BinauralBeatEngine.disconnectAudioNode(this.gains.left);
+    BinauralBeatEngine.disconnectAudioNode(this.gains.right);
+    BinauralBeatEngine.disconnectAudioNode(this.merger);
+    BinauralBeatEngine.disconnectAudioNode(this.masterGain);
+
+    this.oscillators = { left: null, right: null };
+    this.gains = { left: null, right: null };
+    this.merger = null;
+    this.masterGain = null;
+
+    if (!preserveToken) {
+      this.startToken = null;
     }
   }
 }

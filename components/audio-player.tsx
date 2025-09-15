@@ -21,6 +21,23 @@ export function AudioPlayer({
 }: AudioPlayerProps): React.ReactElement {
   const [trackName, setTrackName] = React.useState<string>(currentTrack ?? '')
 
+  React.useEffect(() => {
+    if (!engineReady || trackName !== '') {
+      return
+    }
+
+    const defaultTrack = tracks.find((track) => {
+      if (typeof track?.name !== 'string') {
+        return false
+      }
+      return track.name.trim() !== ''
+    })
+
+    if (typeof defaultTrack?.name === 'string' && defaultTrack.name.trim() !== '') {
+      setTrackName(defaultTrack.name)
+    }
+  }, [engineReady, trackName, tracks])
+
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
     setTrackName(event.target.value)
   }
