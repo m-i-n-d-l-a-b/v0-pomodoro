@@ -21,6 +21,23 @@ export function AudioPlayer({
 }: AudioPlayerProps): React.ReactElement {
   const [trackName, setTrackName] = React.useState<string>(currentTrack ?? '')
 
+  React.useEffect(() => {
+    if (!engineReady || trackName !== '') {
+      return
+    }
+
+    const defaultTrack = tracks.find((track) => {
+      if (typeof track?.name !== 'string') {
+        return false
+      }
+      return track.name.trim() !== ''
+    })
+
+    if (typeof defaultTrack?.name === 'string' && defaultTrack.name.trim() !== '') {
+      setTrackName(defaultTrack.name)
+    }
+  }, [engineReady, trackName, tracks])
+
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
     setTrackName(event.target.value)
   }
@@ -29,7 +46,10 @@ export function AudioPlayer({
     if (trackName === '' || !engineReady) {
       return
     }
-    toggle(trackName)
+    void toggle(trackName).catch((error: unknown) => {
+      const message = error instanceof Error && error.message ? error.message : 'Unknown error'
+      console.error(`Unable to toggle binaural beats: ${message}`)
+    })
   }
 
   const isCurrentTrack = isPlaying && currentTrack === trackName
