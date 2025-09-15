@@ -5,9 +5,9 @@ import { BinauralBeatEngine, TRACKS, BinauralTrack } from '../lib/audio-engine';
 export interface UseBinauralBeatsResult {
   currentTrack: string | null;
   isPlaying: boolean;
-  play: (trackName: string) => void;
+  play: (trackName: string) => Promise<void>;
   pause: () => void;
-  toggle: (trackName: string) => void;
+  toggle: (trackName: string) => Promise<void>;
 }
 
 // Helper to look up a track definition by name with runtime validation
@@ -17,6 +17,7 @@ function findTrack(name: string): BinauralTrack | null {
 
 export function useBinauralBeats(): UseBinauralBeatsResult {
   const engineRef = useRef<BinauralBeatEngine | null>(null);
+  const pendingTrackRef = useRef<string | null>(null);
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
@@ -32,7 +33,7 @@ export function useBinauralBeats(): UseBinauralBeatsResult {
   }, []);
 
   const play = useCallback(
-    (trackName: string): void => {
+    async (trackName: string): Promise<void> => {
       const track = findTrack(trackName);
       if (track === null) {
         console.error(`Track "${trackName}" does not exist`);
@@ -42,16 +43,39 @@ export function useBinauralBeats(): UseBinauralBeatsResult {
       const engine = ensureEngine();
       if (engine === null) {
         console.error('BinauralBeatEngine is not available');
+        pendingTrackRef.current = null;
         return;
       }
 
+      pendingTrackRef.current = track.name;
+
       try {
-        engine.start(track);
+        const started = await engine.start(track);
+        if (!started) {
+          if (pendingTrackRef.current === track.name) {
+            pendingTrackRef.current = null;
+          }
+          return;
+        }
+
+        if (pendingTrackRef.current !== track.name) {
+          if (pendingTrackRef.current === null) {
+            engine.stop();
+          }
+          return;
+        }
+
+        pendingTrackRef.current = null;
         setCurrentTrack(track.name);
         setIsPlaying(true);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         console.error(`Unable to start binaural beats: ${message}`);
+        setCurrentTrack(null);
+        setIsPlaying(false);
+        if (pendingTrackRef.current === track.name) {
+          pendingTrackRef.current = null;
+        }
       }
     },
     [ensureEngine]
@@ -62,17 +86,18 @@ export function useBinauralBeats(): UseBinauralBeatsResult {
     if (engine?.isPlaying()) {
       engine.stop();
     }
+    pendingTrackRef.current = null;
     setIsPlaying(false);
     setCurrentTrack(null);
   }, []);
 
   const toggle = useCallback(
-    (trackName: string): void => {
+    async (trackName: string): Promise<void> => {
       if (isPlaying && currentTrack === trackName) {
         pause();
         return;
       }
-      play(trackName);
+      await play(trackName);
     },
     [currentTrack, isPlaying, pause, play]
   );
@@ -81,9 +106,10 @@ export function useBinauralBeats(): UseBinauralBeatsResult {
   useEffect(() => {
     return (): void => {
       const engine = engineRef.current;
-      if (engine?.isPlaying()) {
-        engine.stop();
+      if (engine !== null) {
+        void engine.destroy();
       }
+      pendingTrackRef.current = null;
       engineRef.current = null;
     };
   }, []);

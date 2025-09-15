@@ -20,94 +20,205 @@ interface OscillatorPair {
   right: OscillatorNode | null;
 }
 
+interface GainPair {
+  left: GainNode | null;
+  right: GainNode | null;
+}
+
+type AudioContextConstructor = typeof AudioContext;
+
+declare global {
+  interface Window {
+    webkitAudioContext?: AudioContextConstructor;
+  }
+}
+
 export class BinauralBeatEngine {
   private context: AudioContext | null = null;
   private oscillators: OscillatorPair = { left: null, right: null };
+  private gains: GainPair = { left: null, right: null };
+  private merger: ChannelMergerNode | null = null;
+  private masterGain: GainNode | null = null;
+  private startToken: symbol | null = null;
 
   /**
    * Start playing the provided track.
    * Validates Web Audio support and track integrity.
    */
-  public start(track: BinauralTrack): void {
+  public async start(track: BinauralTrack): Promise<boolean> {
     if (!BinauralBeatEngine.isValidTrack(track)) {
       throw new Error('Invalid track definition');
     }
 
-    if (typeof window === 'undefined') {
-      throw new Error('Web Audio API not supported in this environment');
-    }
-
-    const AudioContextCtor = window.AudioContext;
-    if (typeof AudioContextCtor !== 'function') {
+    const AudioContextCtor = BinauralBeatEngine.resolveAudioContextConstructor();
+    if (AudioContextCtor === null) {
       throw new Error('Web Audio API not supported in this browser');
     }
 
-    this.context = this.context ?? new AudioContextCtor();
-    const ctx = this.context;
-    if (ctx == null) {
-      throw new Error('Unable to create audio context');
+    let ctx = this.context;
+    if (ctx === null) {
+      try {
+        ctx = new AudioContextCtor();
+      } catch (error) {
+        const message = error instanceof Error && error.message ? error.message : 'Unable to create audio context';
+        throw new Error(`Unable to create audio context: ${message}`);
+      }
+      this.context = ctx;
     }
 
-    // Resume context if it was previously suspended
+    if (ctx === null) {
+      throw new Error('Unable to initialise audio context');
+    }
+
+    const token = Symbol('binaural-start');
+    this.startToken = token;
+
     if (ctx.state === 'suspended') {
-      void ctx.resume();
+      try {
+        await ctx.resume();
+      } catch (error) {
+        const message = error instanceof Error && error.message ? error.message : 'Unable to resume audio context';
+        throw new Error(message);
+      }
+    }
+
+    if (this.startToken !== token) {
+      return false;
     }
 
     if (this.isPlaying()) {
       this.stop();
     }
 
-    const leftFrequency = track.leftHz ?? null;
-    const rightFrequency = track.rightHz ?? null;
-    if (leftFrequency === null || rightFrequency === null) {
-      throw new Error('Track frequencies are missing');
+    if (this.startToken !== token) {
+      return false;
     }
 
+    const leftFrequency = track.leftHz;
+    const rightFrequency = track.rightHz;
+
+    if (!BinauralBeatEngine.isFrequency(leftFrequency) || !BinauralBeatEngine.isFrequency(rightFrequency)) {
+      throw new Error('Track frequencies must be finite positive numbers');
+    }
+
+    let leftOscillator: OscillatorNode | null = null;
+    let rightOscillator: OscillatorNode | null = null;
+    let leftGain: GainNode | null = null;
+    let rightGain: GainNode | null = null;
+    let merger: ChannelMergerNode | null = null;
+    let masterGain: GainNode | null = null;
+
     try {
-      const leftOsc = ctx.createOscillator();
-      const rightOsc = ctx.createOscillator();
+      merger = ctx.createChannelMerger(2);
+      merger.channelInterpretation = 'discrete';
 
-      leftOsc.type = 'sine';
-      rightOsc.type = 'sine';
+      leftGain = ctx.createGain();
+      rightGain = ctx.createGain();
+      masterGain = ctx.createGain();
 
-      leftOsc.frequency.value = leftFrequency;
-      rightOsc.frequency.value = rightFrequency;
+      leftGain.channelCount = 1;
+      leftGain.channelCountMode = 'explicit';
+      leftGain.channelInterpretation = 'discrete';
 
-      leftOsc.connect(ctx.destination);
-      rightOsc.connect(ctx.destination);
+      rightGain.channelCount = 1;
+      rightGain.channelCountMode = 'explicit';
+      rightGain.channelInterpretation = 'discrete';
 
-      leftOsc.start();
-      rightOsc.start();
+      const safeGainValue = 0.25;
+      leftGain.gain.value = safeGainValue;
+      rightGain.gain.value = safeGainValue;
+      masterGain.gain.value = 0.5;
+      masterGain.channelCountMode = 'explicit';
+      masterGain.channelInterpretation = 'speakers';
 
-      this.oscillators = { left: leftOsc, right: rightOsc };
+      leftOscillator = ctx.createOscillator();
+      rightOscillator = ctx.createOscillator();
+
+      leftOscillator.type = 'sine';
+      rightOscillator.type = 'sine';
+
+      leftOscillator.frequency.value = leftFrequency;
+      rightOscillator.frequency.value = rightFrequency;
+
+      leftOscillator.connect(leftGain);
+      rightOscillator.connect(rightGain);
+
+      leftGain.connect(merger, 0, 0);
+      rightGain.connect(merger, 0, 1);
+      merger.connect(masterGain);
+      masterGain.connect(ctx.destination);
+
+      leftOscillator.start();
+      rightOscillator.start();
+
+      this.oscillators = { left: leftOscillator, right: rightOscillator };
+      this.gains = { left: leftGain, right: rightGain };
+      this.merger = merger;
+      this.masterGain = masterGain;
+      return true;
     } catch (error) {
+      BinauralBeatEngine.safelyStopOscillator(leftOscillator);
+      BinauralBeatEngine.safelyStopOscillator(rightOscillator);
+      BinauralBeatEngine.disconnectAudioNode(leftGain);
+      BinauralBeatEngine.disconnectAudioNode(rightGain);
+      BinauralBeatEngine.disconnectAudioNode(merger);
+      BinauralBeatEngine.disconnectAudioNode(masterGain);
       this.oscillators = { left: null, right: null };
-      const message = (error instanceof Error && error.message) ? error.message : 'Unknown error';
+      this.gains = { left: null, right: null };
+      this.merger = null;
+      this.masterGain = null;
+      if (this.startToken === token) {
+        this.startToken = null;
+      }
+
+      const message = error instanceof Error && error.message ? error.message : 'Unknown error';
       throw new Error(`Unable to start binaural beats: ${message}`);
     }
   }
 
   /** Stop playback and release oscillators. */
   public stop(): void {
-    const leftOsc = this.oscillators.left;
-    const rightOsc = this.oscillators.right;
+    BinauralBeatEngine.safelyStopOscillator(this.oscillators.left);
+    BinauralBeatEngine.safelyStopOscillator(this.oscillators.right);
 
-    if (leftOsc) {
-      leftOsc.stop();
-      leftOsc.disconnect();
-    }
-
-    if (rightOsc) {
-      rightOsc.stop();
-      rightOsc.disconnect();
-    }
+    BinauralBeatEngine.disconnectAudioNode(this.oscillators.left);
+    BinauralBeatEngine.disconnectAudioNode(this.oscillators.right);
+    BinauralBeatEngine.disconnectAudioNode(this.gains.left);
+    BinauralBeatEngine.disconnectAudioNode(this.gains.right);
+    BinauralBeatEngine.disconnectAudioNode(this.merger);
+    BinauralBeatEngine.disconnectAudioNode(this.masterGain);
 
     this.oscillators = { left: null, right: null };
+    this.gains = { left: null, right: null };
+    this.merger = null;
+    this.masterGain = null;
+    this.startToken = null;
   }
 
   /** Indicates whether the engine is currently playing a track. */
   public isPlaying(): boolean {
     return this.oscillators.left !== null && this.oscillators.right !== null;
+  }
+
+  /**
+   * Stop playback and close the audio context.
+   * Useful when unmounting components to release browser resources.
+   */
+  public async destroy(): Promise<void> {
+    this.stop();
+
+    const ctx = this.context;
+    if (ctx !== null) {
+      try {
+        await ctx.close();
+      } catch (error) {
+        const message = error instanceof Error && error.message ? error.message : 'Unknown error';
+        console.error(`Failed to close audio context: ${message}`);
+      } finally {
+        this.context = null;
+        this.startToken = null;
+      }
+    }
   }
 
   // Runtime validation to ensure the object conforms to BinauralTrack.
@@ -117,6 +228,49 @@ export class BinauralBeatEngine {
       typeof track.leftHz === 'number' &&
       typeof track.rightHz === 'number'
     );
+  }
+
+  private static resolveAudioContextConstructor(): AudioContextConstructor | null {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const ctor = window.AudioContext ?? window.webkitAudioContext ?? null;
+    return typeof ctor === 'function' ? ctor : null;
+  }
+
+  private static isFrequency(value: number): boolean {
+    return Number.isFinite(value) && value > 0;
+  }
+
+  private static safelyStopOscillator(oscillator: OscillatorNode | null): void {
+    if (oscillator === null) {
+      return;
+    }
+
+    try {
+      oscillator.stop();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'InvalidStateError') {
+        return;
+      }
+      throw error;
+    }
+  }
+
+  private static disconnectAudioNode(node: AudioNode | null): void {
+    if (node === null) {
+      return;
+    }
+
+    try {
+      node.disconnect();
+    } catch (error) {
+      const shouldIgnore = error instanceof DOMException && error.name === 'InvalidAccessError';
+      if (!shouldIgnore) {
+        throw error;
+      }
+    }
   }
 }
 

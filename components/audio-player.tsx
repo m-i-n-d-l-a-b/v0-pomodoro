@@ -29,7 +29,10 @@ export function AudioPlayer({
     if (trackName === '' || !engineReady) {
       return
     }
-    toggle(trackName)
+    void toggle(trackName).catch((error: unknown) => {
+      const message = error instanceof Error && error.message ? error.message : 'Unknown error'
+      console.error(`Unable to toggle binaural beats: ${message}`)
+    })
   }
 
   const isCurrentTrack = isPlaying && currentTrack === trackName
