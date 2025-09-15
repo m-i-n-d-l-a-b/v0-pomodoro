@@ -7,6 +7,9 @@ import { DynamicBackground } from "@/components/dynamic-background"
 import { CircularProgress } from "@/components/circular-progress"
 import { TimerDisplay } from "@/components/timer-display"
 import { SettingsPanel } from "@/components/settings-panel"
+import { AudioPlayer } from "@/components/audio-player"
+import { useBinauralBeats } from "@/hooks/useBinauralBeats"
+import { TRACKS } from "@/lib/audio-engine"
 
 export default function PomodoroApp() {
   const [timeLeft, setTimeLeft] = useState(25 * 60) // 25 minutes in seconds
@@ -21,11 +24,13 @@ export default function PomodoroApp() {
   })
   const [currentSession, setCurrentSession] = useState(1)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const { currentTrack, isPlaying, toggle } = useBinauralBeats()
+  const isClient: boolean = typeof window !== "undefined"
 
   useEffect(() => {
     if (isActive && timeLeft > 0) {
       intervalRef.current = setInterval(() => {
-        setTimeLeft((time) => time - 1)
+        setTimeLeft((time: number): number => time - 1)
       }, 1000)
     } else if (timeLeft === 0) {
       // Timer finished - play notification sound
@@ -43,7 +48,7 @@ export default function PomodoroApp() {
         setIsBreak(true)
         const isLongBreak = currentSession % settings.sessionsUntilLongBreak === 0
         setTimeLeft((isLongBreak ? settings.longBreak : settings.shortBreak) * 60)
-        setCurrentSession((prev) => prev + 1)
+        setCurrentSession((prev: number): number => prev + 1)
       }
     } else {
       if (intervalRef.current) {
@@ -101,52 +106,64 @@ export default function PomodoroApp() {
             </div>
 
             {/* Controls */}
-            <div className="flex items-center justify-center gap-4">
-              <Button
-                onClick={toggleTimer}
-                size="lg"
-                className="bg-white/10 hover:bg-white/20 text-white rounded-full w-16 h-16 p-0 backdrop-blur-sm border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                aria-label={isActive ? "Pause timer" : "Start timer"}
-              >
-                {isActive ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-              </Button>
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center justify-center gap-4">
+                <Button
+                  onClick={toggleTimer}
+                  size="lg"
+                  className="bg-white/10 hover:bg-white/20 text-white rounded-full w-16 h-16 p-0 backdrop-blur-sm border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  aria-label={isActive ? "Pause timer" : "Start timer"}
+                >
+                  {isActive ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+                </Button>
 
-              <Button
-                onClick={resetTimer}
-                variant="outline"
-                size="lg"
-                className="rounded-full w-12 h-12 p-0 bg-white/5 hover:bg-white/10 backdrop-blur-sm border-white/20 text-white hover:text-white transition-all duration-300 hover:scale-105"
-                aria-label="Reset timer"
-              >
-                <RotateCcw className="w-5 h-5" />
-              </Button>
+                <Button
+                  onClick={resetTimer}
+                  variant="outline"
+                  size="lg"
+                  className="rounded-full w-12 h-12 p-0 bg-white/5 hover:bg-white/10 backdrop-blur-sm border-white/20 text-white hover:text-white transition-all duration-300 hover:scale-105"
+                  aria-label="Reset timer"
+                >
+                  <RotateCcw className="w-5 h-5" />
+                </Button>
 
-              <Button
-                onClick={() => setShowSettings(true)}
-                variant="outline"
-                size="lg"
-                className="rounded-full w-12 h-12 p-0 bg-white/5 hover:bg-white/10 backdrop-blur-sm border-white/20 text-white hover:text-white transition-all duration-300 hover:scale-105"
-                aria-label="Open settings"
-              >
-                <Settings className="w-5 h-5" />
-              </Button>
+                <Button
+                  onClick={() => setShowSettings(true)}
+                  variant="outline"
+                  size="lg"
+                  className="rounded-full w-12 h-12 p-0 bg-white/5 hover:bg-white/10 backdrop-blur-sm border-white/20 text-white hover:text-white transition-all duration-300 hover:scale-105"
+                  aria-label="Open settings"
+                >
+                  <Settings className="w-5 h-5" />
+                </Button>
+              </div>
+              <AudioPlayer
+                tracks={TRACKS}
+                currentTrack={currentTrack}
+                isPlaying={isPlaying}
+                toggle={toggle}
+                engineReady={isClient}
+              />
             </div>
 
             {/* Progress Indicator */}
             <div className="space-y-2">
               <div className="flex justify-center gap-2" role="progressbar" aria-label="Session progress">
-                {Array.from({ length: settings.sessionsUntilLongBreak }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                      i < currentSession - 1
-                        ? "bg-white/80 shadow-sm scale-110"
-                        : i === currentSession - 1 && !isBreak
-                          ? "bg-white/80 animate-pulse shadow-sm scale-110"
-                          : "bg-white/20"
-                    }`}
-                  />
-                ))}
+                {Array.from(
+                  { length: settings.sessionsUntilLongBreak },
+                  (_: unknown, i: number) => (
+                    <div
+                      key={i}
+                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                        i < currentSession - 1
+                          ? "bg-white/80 shadow-sm scale-110"
+                          : i === currentSession - 1 && !isBreak
+                            ? "bg-white/80 animate-pulse shadow-sm scale-110"
+                            : "bg-white/20"
+                      }`}
+                    />
+                  ),
+                )}
               </div>
               <p className="text-sm text-gray-400">
                 {Math.max(0, settings.sessionsUntilLongBreak - (currentSession - 1))} sessions until long break
