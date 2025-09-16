@@ -10,9 +10,9 @@ export interface BinauralTrack {
 }
 
 export const TRACKS: ReadonlyArray<BinauralTrack> = Object.freeze([
-  { name: 'Alpha', leftHz: 210, rightHz: 220 },
-  { name: 'Beta', leftHz: 210, rightHz: 240 },
-  { name: 'Gamma', leftHz: 210, rightHz: 260 }
+  { name: 'Alpha Waves', leftHz: 210, rightHz: 220 },
+  { name: 'Beta Waves', leftHz: 210, rightHz: 240 },
+  { name: 'Gamma Waves', leftHz: 210, rightHz: 260 }
 ]);
 
 interface OscillatorPair {
@@ -40,6 +40,9 @@ export class BinauralBeatEngine {
   private merger: ChannelMergerNode | null = null;
   private masterGain: GainNode | null = null;
   private startToken: symbol | null = null;
+  private userGestureBound: boolean = false;
+  private muted: boolean = false;
+  private masterGainBase: number = 0.8;
 
   /**
    * Start playing the provided track.
@@ -72,6 +75,26 @@ export class BinauralBeatEngine {
 
     const token = Symbol('binaural-start');
     this.startToken = token;
+
+    // Ensure the context will resume on the next user gesture if the browser blocks auto-play
+    if (!this.userGestureBound && typeof window !== 'undefined') {
+      const resumeOnGesture = async (): Promise<void> => {
+        if (this.context && this.context.state === 'suspended') {
+          try {
+            await this.context.resume();
+          } catch {
+            // Swallow here; a subsequent explicit resume below will report errors
+          }
+        }
+        if (this.context && this.context.state !== 'suspended') {
+          window.removeEventListener('pointerdown', resumeOnGesture);
+          window.removeEventListener('keydown', resumeOnGesture);
+        }
+      };
+      window.addEventListener('pointerdown', resumeOnGesture, { once: true });
+      window.addEventListener('keydown', resumeOnGesture, { once: true });
+      this.userGestureBound = true;
+    }
 
     if (ctx.state === 'suspended') {
       try {
@@ -124,10 +147,11 @@ export class BinauralBeatEngine {
       rightGain.channelCountMode = 'explicit';
       rightGain.channelInterpretation = 'discrete';
 
-      const safeGainValue = 0.25;
+      // Slightly higher default to make audible, while staying safe
+      const safeGainValue = 0.4;
       leftGain.gain.value = safeGainValue;
       rightGain.gain.value = safeGainValue;
-      masterGain.gain.value = 0.5;
+      masterGain.gain.value = this.muted ? 0 : this.masterGainBase;
       masterGain.channelCountMode = 'explicit';
       masterGain.channelInterpretation = 'speakers';
 
@@ -205,6 +229,24 @@ export class BinauralBeatEngine {
         this.startToken = null;
       }
     }
+  }
+
+  /** Mute or unmute output without stopping playback. */
+  public setMuted(isMuted: boolean): void {
+    this.muted = isMuted;
+    const gain = this.masterGain;
+    if (gain !== null) {
+      try {
+        gain.gain.value = this.muted ? 0 : this.masterGainBase;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  /** Returns current mute state. */
+  public isMuted(): boolean {
+    return this.muted;
   }
 
   // Runtime validation to ensure the object conforms to BinauralTrack.

@@ -41,7 +41,7 @@ export function CircularProgress({ progress, size, strokeWidth, isActive }: Circ
           className={`text-white transition-all duration-1000 ease-out`}
           style={{
             filter: isActive
-              ? "drop-shadow(0 0 15px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 30px rgba(255, 255, 255, 0.4))"
+              ? "drop-shadow(0 0 12px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 24px rgba(255, 255, 255, 0.25))"
               : "drop-shadow(0 0 8px rgba(255, 255, 255, 0.3))",
           }}
         />

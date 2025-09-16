@@ -8,6 +8,8 @@ export interface UseBinauralBeatsResult {
   play: (trackName: string) => Promise<void>;
   pause: () => void;
   toggle: (trackName: string) => Promise<void>;
+  muted: boolean;
+  setMuted: (value: boolean) => void;
 }
 
 // Helper to look up a track definition by name with runtime validation
@@ -20,6 +22,7 @@ export function useBinauralBeats(): UseBinauralBeatsResult {
   const pendingTrackRef = useRef<string | null>(null);
   const [currentTrack, setCurrentTrack] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [muted, setMutedState] = useState<boolean>(false);
 
   // Lazily create the engine only when needed and guard against SSR
   const ensureEngine = useCallback((): BinauralBeatEngine | null => {
@@ -114,6 +117,14 @@ export function useBinauralBeats(): UseBinauralBeatsResult {
     };
   }, []);
 
-  return { currentTrack, isPlaying, play, pause, toggle };
+  const setMuted = useCallback((value: boolean): void => {
+    setMutedState(value);
+    const engine = engineRef.current;
+    if (engine !== null) {
+      engine.setMuted(value);
+    }
+  }, []);
+
+  return { currentTrack, isPlaying, play, pause, toggle, muted, setMuted };
 }
 
