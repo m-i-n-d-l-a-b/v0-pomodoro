@@ -28,7 +28,7 @@ export function TimerDisplay({ timeLeft, isActive, title, subtitle }: TimerDispl
         </div>
       ) : null}
       <div
-        className={`text-5xl sm:text-6xl font-bold font-mono transition-all duration-300 ${isActive ? "scale-105" : "scale-100"}`}
+        className={`text-5xl sm:text-6xl font-bold font-sans transition-all duration-300 ${isActive ? "scale-105" : "scale-100"}`}
         style={{
           color: "white",
           textShadow: isActive

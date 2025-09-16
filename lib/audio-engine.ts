@@ -10,9 +10,9 @@ export interface BinauralTrack {
 }
 
 export const TRACKS: ReadonlyArray<BinauralTrack> = Object.freeze([
-  { name: 'Alpha Waves', leftHz: 210, rightHz: 220 },
-  { name: 'Beta Waves', leftHz: 210, rightHz: 240 },
-  { name: 'Gamma Waves', leftHz: 210, rightHz: 260 }
+  { name: 'Alpha Waves', leftHz: 120, rightHz: 128},
+  { name: 'Beta Waves', leftHz: 140, rightHz: 156 },
+  { name: 'Gamma Waves', leftHz: 190, rightHz: 128 }
 ]);
 
 interface OscillatorPair {
