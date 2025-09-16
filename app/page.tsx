@@ -7,6 +7,7 @@ import { DynamicBackground } from "@/components/dynamic-background"
 import { CircularProgress } from "@/components/circular-progress"
 import { TimerDisplay } from "@/components/timer-display"
 import { SettingsPanel } from "@/components/settings-panel"
+import { IntroductionPopup } from "@/components/introduction-popup"
 import { useBinauralBeats } from "@/hooks/useBinauralBeats"
 import { Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react"
 import { TRACKS } from "@/lib/audio-engine"
@@ -16,6 +17,7 @@ export default function PomodoroApp() {
   const [isActive, setIsActive] = useState(false)
   const [isBreak, setIsBreak] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showIntroduction, setShowIntroduction] = useState(false)
   const [settings, setSettings] = useState({
     workTime: 25,
     shortBreak: 5,
@@ -31,6 +33,16 @@ export default function PomodoroApp() {
   })
   const selectedTrack: string = TRACKS[selectedIndex]?.name ?? "Alpha"
   const isClient: boolean = typeof window !== "undefined"
+
+  // Show introduction popup on first visit
+  useEffect(() => {
+    if (isClient) {
+      const hasSeenIntroduction = localStorage.getItem('pomopulse-intro-seen')
+      if (!hasSeenIntroduction) {
+        setShowIntroduction(true)
+      }
+    }
+  }, [isClient])
 
   useEffect(() => {
     if (isActive && timeLeft > 0) {
@@ -84,6 +96,13 @@ export default function PomodoroApp() {
     setIsBreak(false)
     setTimeLeft(settings.workTime * 60)
     setCurrentSession(1)
+  }
+
+  const handleCloseIntroduction = () => {
+    setShowIntroduction(false)
+    if (isClient) {
+      localStorage.setItem('pomopulse-intro-seen', 'true')
+    }
   }
 
   const totalTime = isBreak
@@ -232,6 +251,11 @@ export default function PomodoroApp() {
         settings={settings}
         onSettingsChange={setSettings}
         onReset={resetTimer}
+      />
+
+      <IntroductionPopup
+        isOpen={showIntroduction}
+        onClose={handleCloseIntroduction}
       />
     </div>
   )
