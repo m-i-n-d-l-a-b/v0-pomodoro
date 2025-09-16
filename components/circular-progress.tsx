@@ -15,7 +15,27 @@ export function CircularProgress({ progress, size, strokeWidth, isActive }: Circ
 
   return (
     <div className="relative">
-      <svg width={size} height={size} className="transform -rotate-90">
+      <svg
+        width={size}
+        height={size}
+        className="transform -rotate-90"
+        style={{ overflow: "visible" }}
+      >
+        <defs>
+          <filter
+            id="progress-glow"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+            colorInterpolationFilters="sRGB"
+            filterUnits="userSpaceOnUse"
+          >
+            {/* Subtle layered glow to avoid harsh edges and clipping */}
+            <feDropShadow dx="0" dy="0" stdDeviation={isActive ? 4 : 2} floodColor="#ffffff" floodOpacity={isActive ? 0.5 : 0.3} />
+            <feDropShadow dx="0" dy="0" stdDeviation={isActive ? 8 : 4} floodColor="#ffffff" floodOpacity={isActive ? 0.25 : 0.15} />
+          </filter>
+        </defs>
         {/* Background circle */}
         <circle
           cx={size / 2}
@@ -39,11 +59,7 @@ export function CircularProgress({ progress, size, strokeWidth, isActive }: Circ
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
           className={`text-white transition-all duration-1000 ease-out`}
-          style={{
-            filter: isActive
-              ? "drop-shadow(0 0 12px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 24px rgba(255, 255, 255, 0.25))"
-              : "drop-shadow(0 0 8px rgba(255, 255, 255, 0.3))",
-          }}
+          filter="url(#progress-glow)"
         />
       </svg>
     </div>

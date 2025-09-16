@@ -28,12 +28,18 @@ export function TimerDisplay({ timeLeft, isActive, title, subtitle }: TimerDispl
         </div>
       ) : null}
       <div
-        className={`text-5xl sm:text-6xl font-bold font-sans transition-all duration-300 ${isActive ? "scale-105" : "scale-100"}`}
+        className={`text-5xl sm:text-6xl font-bold font-sans tabular-nums leading-none transition-all duration-300 ${
+          isActive ? "scale-105" : "scale-100"
+        }`}
         style={{
           color: "white",
           textShadow: isActive
             ? "0 0 15px rgba(255, 255, 255, 0.4), 0 0 20px rgba(255, 255, 255, 0.25)"
             : "0 0 10px rgba(255, 255, 255, 0.3)",
+          fontVariantNumeric: "tabular-nums",
+          fontFeatureSettings: '"tnum" 1, "lnum" 1',
+          minWidth: "6ch",
+          textAlign: "center",
         }}
       >
         {formatTime(minutes)}:{formatTime(seconds)}

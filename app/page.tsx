@@ -96,14 +96,14 @@ export default function PomodoroApp() {
     <div className="min-h-screen relative overflow-hidden">
       <DynamicBackground isActive={isActive} isBreak={isBreak} />
 
+      {/* Top Header */}
+      <div className="absolute top-4 left-0 right-0 z-20">
+        <h1 className="text-2xl font-bold text-white drop-shadow-lg text-center text-balance">FLOWMO</h1>
+      </div>
+
       <div className="relative z-10 min-h-screen flex items-center justify-center p-3">
         <div className="p-6 rounded-2xl max-w-sm w-full bg-transparent">
           <div className="text-center space-y-6">
-            {/* Page Header */}
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-white drop-shadow-lg text-balance">FLOWMO</h1>
-            </div>
-
             {/* Timer Circle */}
             <div className="relative flex items-center justify-center">
               <CircularProgress progress={progress} size={240} strokeWidth={6} isActive={isActive} />
