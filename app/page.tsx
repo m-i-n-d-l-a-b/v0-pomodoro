@@ -188,7 +188,7 @@ export default function PomodoroApp() {
                 <div
                   role="status"
                   aria-live="polite"
-                  className="px-3 h-9 flex items-center justify-center min-w-[140px] text-center"
+                  className="px-3 py-2 h-9 flex items-center justify-center min-w-[140px] text-center"
                 >
                   {selectedTrack}
                 </div>
