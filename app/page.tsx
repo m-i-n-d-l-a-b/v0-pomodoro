@@ -98,7 +98,7 @@ export default function PomodoroApp() {
 
       {/* Top Header */}
       <div className="absolute top-4 left-0 right-0 z-20">
-        <h1 className="text-2xl font-bold text-white drop-shadow-lg text-center text-balance">FLOWMO</h1>
+        <h1 className="text-2xl font-bold text-white drop-shadow-lg text-center text-balance">POMOPULSE</h1>
       </div>
 
       <div className="relative z-10 min-h-screen flex items-center justify-center p-3">
