@@ -5,23 +5,27 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { X } from "lucide-react"
 
+interface PomodoroSettings {
+  workTime: number
+  shortBreak: number
+  longBreak: number
+  sessionsUntilLongBreak: number
+}
+
+type SettingsKey = keyof PomodoroSettings
+
 interface SettingsPanelProps {
   isOpen: boolean
   onClose: () => void
-  settings: {
-    workTime: number
-    shortBreak: number
-    longBreak: number
-    sessionsUntilLongBreak: number
-  }
-  onSettingsChange: (settings: any) => void
+  settings: PomodoroSettings
+  onSettingsChange: (settings: PomodoroSettings) => void
   onReset: () => void
 }
 
-export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onReset }: SettingsPanelProps) {
+export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onReset }: SettingsPanelProps): JSX.Element | null {
   if (!isOpen) return null
 
-  const handleSettingChange = (key: string, value: number) => {
+  const handleSettingChange = (key: SettingsKey, value: number): void => {
     const clampedValue = Math.max(
       1,
       Math.min(value, key === "workTime" || key === "longBreak" ? 60 : key === "shortBreak" ? 30 : 8),
@@ -32,7 +36,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
     })
   }
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     onReset()
     onClose()
   }
@@ -64,7 +68,9 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               min="1"
               max="60"
               value={settings.workTime}
-              onChange={(e) => handleSettingChange("workTime", Number.parseInt(e.target.value) || 25)}
+              onChange={(event) =>
+                handleSettingChange("workTime", Number.parseInt(event.target.value, 10) || 25)
+              }
               className="bg-black/50 border-white/20 text-white focus:border-white/40 focus:ring-white/20"
             />
           </div>
@@ -79,7 +85,9 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               min="1"
               max="30"
               value={settings.shortBreak}
-              onChange={(e) => handleSettingChange("shortBreak", Number.parseInt(e.target.value) || 5)}
+              onChange={(event) =>
+                handleSettingChange("shortBreak", Number.parseInt(event.target.value, 10) || 5)
+              }
               className="bg-black/50 border-white/20 text-white focus:border-white/40 focus:ring-white/20"
             />
           </div>
@@ -94,7 +102,9 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               min="1"
               max="60"
               value={settings.longBreak}
-              onChange={(e) => handleSettingChange("longBreak", Number.parseInt(e.target.value) || 15)}
+              onChange={(event) =>
+                handleSettingChange("longBreak", Number.parseInt(event.target.value, 10) || 15)
+              }
               className="bg-black/50 border-white/20 text-white focus:border-white/40 focus:ring-white/20"
             />
           </div>
@@ -109,7 +119,12 @@ export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange, onR
               min="2"
               max="8"
               value={settings.sessionsUntilLongBreak}
-              onChange={(e) => handleSettingChange("sessionsUntilLongBreak", Number.parseInt(e.target.value) || 4)}
+              onChange={(event) =>
+                handleSettingChange(
+                  "sessionsUntilLongBreak",
+                  Number.parseInt(event.target.value, 10) || 4,
+                )
+              }
               className="bg-black/50 border-white/20 text-white focus:border-white/40 focus:ring-white/20"
             />
           </div>
