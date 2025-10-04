@@ -1,216 +1,195 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Task, isTaskArray } from '../lib/task-types';
+import { useCallback, useEffect, useState } from "react"
 
-const STORAGE_KEY = 'pomodoro.tasks';
+export interface Task {
+  id: string
+  title: string
+  pomodorosRequired: number
+  pomodorosCompleted: number
+  isCompleted: boolean
+}
 
-interface AddTaskOptions {
-  estimatedPomodoros?: number;
-  completedPomodoros?: number;
+export interface TaskInput {
+  title: string
+  pomodorosRequired: number
 }
 
 export interface UseTaskListResult {
-  tasks: Task[];
-  addTask: (label: string, options?: AddTaskOptions) => void;
-  editTaskLabel: (id: string, nextLabel: string) => void;
-  toggleTaskComplete: (id: string) => void;
-  deleteTask: (id: string) => void;
-  reorderTasks: (startIndex: number, endIndex: number) => void;
-  incrementPomodoros: (id: string) => void;
+  tasks: Task[]
+  addTask: (task: TaskInput) => Task | null
+  deleteTask: (taskId: string) => Task | null
+  toggleTaskComplete: (taskId: string) => Task | null
+  incrementPomodoros: (taskId: string) => Task | null
+  getTaskById: (taskId: string) => Task | null
 }
 
-const safeReadTasks = (): Task[] => {
-  if (typeof window === 'undefined') {
-    return [];
+const STORAGE_KEY = "pomopulse.tasks"
+
+const isTask = (value: unknown): value is Task => {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const maybeTask = value as Partial<Task>
+  return (
+    typeof maybeTask.id === "string" &&
+    typeof maybeTask.title === "string" &&
+    typeof maybeTask.pomodorosRequired === "number" &&
+    typeof maybeTask.pomodorosCompleted === "number" &&
+    typeof maybeTask.isCompleted === "boolean"
+  )
+}
+
+const createId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+  return `task-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const parseStoredTasks = (rawValue: unknown): Task[] => {
+  if (typeof rawValue !== "string") {
+    return []
   }
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) {
-      return [];
+    const parsed = JSON.parse(rawValue) as unknown
+    if (!Array.isArray(parsed)) {
+      return []
     }
 
-    const parsed: unknown = JSON.parse(raw);
-    if (isTaskArray(parsed)) {
-      return parsed.map((task: Task) => ({ ...task }));
-    }
-
-    console.warn('Stored task data is invalid. Falling back to an empty list.');
-    return [];
+    return parsed
+      .filter(isTask)
+      .map((task: Task): Task => ({
+        ...task,
+        pomodorosRequired: Math.max(1, Math.round(task.pomodorosRequired)),
+        pomodorosCompleted: Math.max(0, Math.min(Math.round(task.pomodorosCompleted), Math.max(1, Math.round(task.pomodorosRequired)))),
+      }))
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Failed to parse tasks from localStorage: ${message}`);
-    return [];
+    console.error("Failed to parse stored tasks", error)
+    return []
   }
-};
+}
 
-const generateTaskId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `task-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-};
-
-export const useTaskList = (): UseTaskListResult => {
-  const [tasks, setTasks] = useState<Task[]>(() => safeReadTasks());
+export function useTaskList(): UseTaskListResult {
+  const [tasks, setTasks] = useState<Task[]>([])
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
+    if (typeof window === "undefined") {
+      return
     }
 
-    try {
-      const serialized = JSON.stringify(tasks);
-      window.localStorage.setItem(STORAGE_KEY, serialized);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`Failed to persist tasks: ${message}`);
-      if (tasks.length > 0) {
-        setTasks([]);
-      }
-    }
-  }, [tasks]);
-
-  const addTask = useCallback(
-    (label: string, options?: AddTaskOptions): void => {
-      const trimmedLabel = label.trim();
-      if (trimmedLabel.length === 0) {
-        return;
-      }
-
-      const estimated = options?.estimatedPomodoros;
-      const completed = options?.completedPomodoros;
-
-      setTasks((previous: Task[]) => {
-        const nextTask: Task = {
-          id: generateTaskId(),
-          label: trimmedLabel,
-          isCompleted: false,
-          createdAt: new Date().toISOString(),
-        };
-
-        if (typeof estimated === 'number' && Number.isFinite(estimated) && estimated >= 0) {
-          nextTask.estimatedPomodoros = estimated;
-        }
-
-        if (typeof completed === 'number' && Number.isFinite(completed) && completed >= 0) {
-          nextTask.completedPomodoros = completed;
-        }
-
-        return [...previous, nextTask];
-      });
-    },
-    []
-  );
-
-  const editTaskLabel = useCallback((id: string, nextLabel: string): void => {
-    const trimmedLabel = nextLabel.trim();
-    if (trimmedLabel.length === 0) {
-      return;
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    if (!stored) {
+      return
     }
 
-    setTasks((previous: Task[]) => {
-      let updated = false;
+    const parsedTasks = parseStoredTasks(stored)
+    if (parsedTasks.length > 0) {
+      setTasks(parsedTasks)
+    }
+  }, [])
 
-      const nextTasks = previous.map((task: Task) => {
-        if (task.id !== id) {
-          return task;
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
+  }, [tasks])
+
+  const addTask = useCallback((task: TaskInput): Task | null => {
+    const trimmedTitle = task.title.trim()
+    if (trimmedTitle.length === 0) {
+      return null
+    }
+
+    const required = Number.isFinite(task.pomodorosRequired)
+      ? Math.max(1, Math.round(task.pomodorosRequired))
+      : 1
+
+    const newTask: Task = {
+      id: createId(),
+      title: trimmedTitle,
+      pomodorosRequired: required,
+      pomodorosCompleted: 0,
+      isCompleted: false,
+    }
+
+    setTasks((previous: Task[]): Task[] => [...previous, newTask])
+    return newTask
+  }, [])
+
+  const deleteTask = useCallback((taskId: string): Task | null => {
+    let removedTask: Task | null = null
+    setTasks((previous: Task[]): Task[] => {
+      const nextTasks = previous.filter((task: Task): boolean => {
+        if (task.id === taskId) {
+          removedTask = task
+          return false
+        }
+        return true
+      })
+      return nextTasks
+    })
+    return removedTask
+  }, [])
+
+  const toggleTaskComplete = useCallback((taskId: string): Task | null => {
+    let updatedTask: Task | null = null
+    setTasks((previous: Task[]): Task[] =>
+      previous.map((task: Task): Task => {
+        if (task.id !== taskId) {
+          return task
+        }
+        const isCompleted = !task.isCompleted
+        const pomodorosCompleted = isCompleted
+          ? task.pomodorosRequired
+          : Math.min(task.pomodorosCompleted, task.pomodorosRequired)
+
+        updatedTask = {
+          ...task,
+          isCompleted,
+          pomodorosCompleted,
+        }
+        return updatedTask
+      }),
+    )
+    return updatedTask
+  }, [])
+
+  const incrementPomodoros = useCallback((taskId: string): Task | null => {
+    let updatedTask: Task | null = null
+    setTasks((previous: Task[]): Task[] =>
+      previous.map((task: Task): Task => {
+        if (task.id !== taskId) {
+          return task
         }
 
-        if (task.label === trimmedLabel) {
-          return task;
+        if (task.pomodorosCompleted >= task.pomodorosRequired) {
+          updatedTask = task
+          return task
         }
 
-        updated = true;
-        return { ...task, label: trimmedLabel };
-      });
-
-      return updated ? nextTasks : previous;
-    });
-  }, []);
-
-  const toggleTaskComplete = useCallback((id: string): void => {
-    setTasks((previous: Task[]) => {
-      let updated = false;
-
-      const nextTasks = previous.map((task: Task) => {
-        if (task.id !== id) {
-          return task;
+        updatedTask = {
+          ...task,
+          pomodorosCompleted: Math.min(task.pomodorosRequired, task.pomodorosCompleted + 1),
         }
+        return updatedTask
+      }),
+    )
+    return updatedTask
+  }, [])
 
-        updated = true;
-        return { ...task, isCompleted: !task.isCompleted };
-      });
-
-      return updated ? nextTasks : previous;
-    });
-  }, []);
-
-  const deleteTask = useCallback((id: string): void => {
-    setTasks((previous: Task[]) => {
-      const nextTasks = previous.filter((task: Task) => task.id !== id);
-      if (nextTasks.length === previous.length) {
-        return previous;
-      }
-      return nextTasks;
-    });
-  }, []);
-
-  const reorderTasks = useCallback((startIndex: number, endIndex: number): void => {
-    setTasks((previous: Task[]) => {
-      if (!Number.isInteger(startIndex) || !Number.isInteger(endIndex)) {
-        console.warn('reorderTasks received non-integer indices.');
-        return previous;
-      }
-
-      if (
-        startIndex < 0 ||
-        startIndex >= previous.length ||
-        endIndex < 0 ||
-        endIndex >= previous.length
-      ) {
-        console.warn('reorderTasks received indices outside the task range.');
-        return previous;
-      }
-
-      if (startIndex === endIndex) {
-        return previous;
-      }
-
-      const nextTasks = [...previous];
-      const [movedTask] = nextTasks.splice(startIndex, 1);
-      if (movedTask === undefined) {
-        return previous;
-      }
-      nextTasks.splice(endIndex, 0, movedTask);
-      return nextTasks;
-    });
-  }, []);
-
-  const incrementPomodoros = useCallback((id: string): void => {
-    setTasks((previous: Task[]) => {
-      let updated = false;
-
-      const nextTasks = previous.map((task: Task) => {
-        if (task.id !== id) {
-          return task;
-        }
-
-        updated = true;
-        const completedCount = task.completedPomodoros ?? 0;
-        return { ...task, completedPomodoros: completedCount + 1 };
-      });
-
-      return updated ? nextTasks : previous;
-    });
-  }, []);
+  const getTaskById = useCallback(
+    (taskId: string): Task | null => tasks.find((task: Task): boolean => task.id === taskId) ?? null,
+    [tasks],
+  )
 
   return {
     tasks,
     addTask,
-    editTaskLabel,
-    toggleTaskComplete,
     deleteTask,
-    reorderTasks,
+    toggleTaskComplete,
     incrementPomodoros,
-  };
-};
+    getTaskById,
+  }
+}

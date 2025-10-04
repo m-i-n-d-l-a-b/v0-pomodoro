@@ -56,6 +56,9 @@ export default function PomodoroApp() {
     sessionsUntilLongBreak: 4,
   })
   const [currentSession, setCurrentSession] = useState(1)
+  const { tasks, addTask, deleteTask, toggleTaskComplete, incrementPomodoros, getTaskById } = useTaskList()
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
+  const [taskWarning, setTaskWarning] = useState<string | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const { currentTrack, isPlaying, toggle, muted, setMuted, play, pause } = useBinauralBeats()
   const [selectedIndex, setSelectedIndex] = useState<number>(() => {
@@ -63,6 +66,10 @@ export default function PomodoroApp() {
     return idx >= 0 ? idx : 0
   })
   const selectedTrack: string = TRACKS[selectedIndex]?.name ?? "Alpha"
+  const activeTask = useMemo<Task | null>(() => (activeTaskId ? getTaskById(activeTaskId) : null), [activeTaskId, getTaskById])
+  const remainingPomodoros: number | null = activeTask
+    ? Math.max(activeTask.pomodorosRequired - activeTask.pomodorosCompleted, 0)
+    : null
   const isClient: boolean = typeof window !== "undefined"
   const { tasks, addTask, editTaskLabel, toggleTaskComplete, deleteTask, reorderTasks, incrementPomodoros } =
     useTaskList()
@@ -150,11 +157,51 @@ export default function PomodoroApp() {
   }, [isClient])
 
   useEffect(() => {
+    if (tasks.length === 0) {
+      setActiveTaskId(null)
+      return
+    }
+
+    setActiveTaskId((previous: string | null): string | null => {
+      if (!previous) {
+        return deriveDefaultActiveTaskId()
+      }
+
+      const existingTask = tasks.find((task: Task): boolean => task.id === previous)
+      if (!existingTask) {
+        return deriveDefaultActiveTaskId()
+      }
+
+      if (existingTask.isCompleted) {
+        const nextIncomplete = tasks.find((task: Task): boolean => !task.isCompleted && task.id !== existingTask.id)
+        return nextIncomplete?.id ?? null
+      }
+
+      return previous
+    })
+  }, [tasks, deriveDefaultActiveTaskId])
+
+  useEffect(() => {
+    if (!taskWarning || !isClient) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setTaskWarning(null)
+    }, 2500)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [taskWarning, isClient])
+
+  useEffect(() => {
     if (isActive && timeLeft > 0) {
       intervalRef.current = setInterval(() => {
         setTimeLeft((time: number): number => time - 1)
       }, 1000)
     } else if (timeLeft === 0) {
+      const completedFocusSession = !isBreak
       // Timer finished - play notification sound
       const audio = new Audio(
         "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuR2O/JdSYELIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuR2O/JdSYELIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuR2O/JdSYE",
@@ -163,6 +210,20 @@ export default function PomodoroApp() {
       audio.play().catch(() => {}) // Ignore errors if audio can't play
 
       setIsActive(false)
+      if (completedFocusSession && activeTaskId) {
+        const updatedTask = incrementPomodoros(activeTaskId)
+        if (!updatedTask) {
+          setActiveTaskId(null)
+        } else {
+          const goalReached = updatedTask.pomodorosCompleted >= updatedTask.pomodorosRequired
+          if (goalReached && !updatedTask.isCompleted) {
+            const completedTask = toggleTaskComplete(updatedTask.id)
+            if (completedTask?.id === activeTaskId) {
+              setActiveTaskId(null)
+            }
+          }
+        }
+      }
       if (isBreak) {
         setIsBreak(false)
         setTimeLeft(settings.workTime * 60)
@@ -221,6 +282,19 @@ export default function PomodoroApp() {
     }
 
     const next = !isActive
+    if (next) {
+      const targetTask = activeTaskId ? getTaskById(activeTaskId) : null
+      if (!targetTask) {
+        setTaskWarning("Please select a task before starting the timer.")
+        return
+      }
+      if (targetTask.isCompleted) {
+        setTaskWarning("The selected task is already complete. Choose another task to start focusing.")
+        return
+      }
+    }
+
+    setTaskWarning(null)
     setIsActive(next)
     // Tie audio playback to timer control
     if (next) {
@@ -353,7 +427,6 @@ export default function PomodoroApp() {
                   }
                 />
               </div>
-            </div>
 
             {/* Controls */}
             <div className="flex flex-col items-center gap-3">
@@ -421,36 +494,65 @@ export default function PomodoroApp() {
                 >
                   {selectedTrack}
                 </div>
+                <div className="inline-flex items-stretch text-white border border-white/20 rounded-md bg-black/20 backdrop-blur-sm shadow-md overflow-hidden">
+                  <button
+                    type="button"
+                    className="px-2 h-9 flex items-center hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-50"
+                    aria-label="Previous track"
+                    onClick={() => {
+                      const prev = selectedIndex <= 0 ? TRACKS.length - 1 : selectedIndex - 1
+                      const name = TRACKS[prev]?.name ?? selectedTrack
+                      setSelectedIndex(prev)
+                      if (isClient && isPlaying) {
+                        void toggle(name).catch(() => {})
+                      }
+                    }}
+                    disabled={TRACKS.length === 0}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
 
-                <button
-                  type="button"
-                  className="px-2 h-9 flex items-center hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-50"
-                  aria-label="Next track"
-                  onClick={() => {
-                    const next = selectedIndex < 0 || selectedIndex >= TRACKS.length - 1 ? 0 : selectedIndex + 1
-                    const name = TRACKS[next]?.name ?? selectedTrack
-                    setSelectedIndex(next)
-                    if (isClient && isPlaying) {
-                      void toggle(name).catch(() => {})
-                    }
-                  }}
-                  disabled={TRACKS.length === 0}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="px-3 py-2 h-9 flex items-center justify-center min-w-[140px] text-center"
+                  >
+                    {selectedTrack}
+                  </div>
 
-                <button
-                  type="button"
-                  className="px-2 h-9 flex items-center hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-                  aria-label={muted ? "Unmute audio" : "Mute audio"}
-                  onClick={() => setMuted(!muted)}
-                >
-                  {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </button>
+                  <button
+                    type="button"
+                    className="px-2 h-9 flex items-center hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-50"
+                    aria-label="Next track"
+                    onClick={() => {
+                      const next = selectedIndex < 0 || selectedIndex >= TRACKS.length - 1 ? 0 : selectedIndex + 1
+                      const name = TRACKS[next]?.name ?? selectedTrack
+                      setSelectedIndex(next)
+                      if (isClient && isPlaying) {
+                        void toggle(name).catch(() => {})
+                      }
+                    }}
+                    disabled={TRACKS.length === 0}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="px-2 h-9 flex items-center hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                    aria-label={muted ? "Unmute audio" : "Mute audio"}
+                    onClick={() => setMuted(!muted)}
+                  >
+                    {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  </button>
+                </div>
+                {taskWarning ? (
+                  <p className="text-xs text-amber-200/90 text-center" role="status" aria-live="polite">
+                    {taskWarning}
+                  </p>
+                ) : null}
               </div>
             </div>
-
-            
           </div>
           <div className="w-full flex-1">
             <div className="rounded-2xl border border-white/10 bg-black/30 p-6 backdrop-blur-sm">
