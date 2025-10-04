@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Play, Pause, RotateCcw, Settings } from "lucide-react"
 import { DynamicBackground } from "@/components/dynamic-background"
@@ -11,6 +11,37 @@ import { IntroductionPopup } from "@/components/introduction-popup"
 import { useBinauralBeats } from "@/hooks/useBinauralBeats"
 import { Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react"
 import { TRACKS } from "@/lib/audio-engine"
+import { TaskList } from "@/components/task-list"
+import { useTaskList } from "@/hooks/useTaskList"
+import type { Task } from "@/lib/task-types"
+
+const selectInitialActiveTaskId = (taskCollection: Task[]): string | null => {
+  const firstIncomplete = taskCollection.find((task: Task) => !task.isCompleted)
+  if (firstIncomplete !== undefined) {
+    return firstIncomplete.id
+  }
+  return null
+}
+
+const resolveActiveTaskId = (taskCollection: Task[], currentId: string | null): string | null => {
+  if (taskCollection.length === 0) {
+    return null
+  }
+
+  if (currentId !== null) {
+    const currentTask = taskCollection.find((task: Task) => task.id === currentId)
+    if (currentTask !== undefined && !currentTask.isCompleted) {
+      return currentTask.id
+    }
+  }
+
+  const nextIncomplete = taskCollection.find((task: Task) => !task.isCompleted)
+  if (nextIncomplete !== undefined) {
+    return nextIncomplete.id
+  }
+
+  return null
+}
 
 export default function PomodoroApp() {
   const [timeLeft, setTimeLeft] = useState(25 * 60) // 25 minutes in seconds
@@ -33,6 +64,80 @@ export default function PomodoroApp() {
   })
   const selectedTrack: string = TRACKS[selectedIndex]?.name ?? "Alpha"
   const isClient: boolean = typeof window !== "undefined"
+  const { tasks, addTask, editTaskLabel, toggleTaskComplete, deleteTask, reorderTasks, incrementPomodoros } =
+    useTaskList()
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(() => selectInitialActiveTaskId(tasks))
+  const [startWarning, setStartWarning] = useState<string | null>(null)
+
+  const activeTask = useMemo<Task | null>(() => {
+    if (activeTaskId === null) {
+      return null
+    }
+    const match = tasks.find((task: Task) => task.id === activeTaskId)
+    return match ?? null
+  }, [activeTaskId, tasks])
+
+  const activeTaskStats = useMemo<
+    | {
+        completedCount: number
+        estimatedCount: number | null
+        remainingCount: number | null
+      }
+    | null
+  >(() => {
+    if (activeTask === null) {
+      return null
+    }
+    const completedCount: number = activeTask.completedPomodoros ?? 0
+    const estimatedValue = activeTask.estimatedPomodoros
+    const estimatedCount: number | null = typeof estimatedValue === "number" ? Math.max(estimatedValue, 0) : null
+    const remainingCount: number | null = estimatedCount !== null ? Math.max(estimatedCount - completedCount, 0) : null
+    return {
+      completedCount,
+      estimatedCount,
+      remainingCount,
+    }
+  }, [activeTask])
+
+  const activeTaskProgressSummary = useMemo<string | null>(() => {
+    if (activeTaskStats === null) {
+      return null
+    }
+    if (activeTaskStats.estimatedCount !== null) {
+      const remainingCount: number = activeTaskStats.remainingCount ?? 0
+      const remainingLabel = remainingCount === 1 ? "pomodoro" : "pomodoros"
+      return `${remainingCount} ${remainingLabel} remaining (${activeTaskStats.completedCount}/${activeTaskStats.estimatedCount})`
+    }
+    const completedLabel = activeTaskStats.completedCount === 1 ? "pomodoro" : "pomodoros"
+    return `${activeTaskStats.completedCount} ${completedLabel} completed`
+  }, [activeTaskStats])
+
+  useEffect(() => {
+    setActiveTaskId((previous: string | null): string | null => {
+      const resolved = resolveActiveTaskId(tasks, previous)
+      return resolved === previous ? previous : resolved
+    })
+  }, [tasks])
+
+  useEffect(() => {
+    if (startWarning !== null && activeTask !== null && !activeTask.isCompleted) {
+      setStartWarning(null)
+    }
+  }, [activeTask, startWarning])
+
+  useEffect(() => {
+    if (!isActive) {
+      return
+    }
+
+    if (activeTask !== null && activeTaskId !== null && !activeTask.isCompleted) {
+      return
+    }
+
+    setIsActive(false)
+    pause()
+    setStartWarning("Select a task to focus on before starting the timer.")
+  }, [activeTask, activeTaskId, isActive, pause])
 
   // Show introduction popup on first visit
   useEffect(() => {
@@ -62,6 +167,22 @@ export default function PomodoroApp() {
         setIsBreak(false)
         setTimeLeft(settings.workTime * 60)
       } else {
+        if (activeTaskId !== null && activeTask !== null) {
+          const completedBefore: number = activeTask.completedPomodoros ?? 0
+          const nextCompleted: number = completedBefore + 1
+          incrementPomodoros(activeTaskId)
+          if (!activeTask.isCompleted) {
+            const estimatedValue = activeTask.estimatedPomodoros
+            const sanitizedEstimate: number | null =
+              typeof estimatedValue === "number" ? Math.max(estimatedValue, 0) : null
+            const shouldComplete: boolean =
+              sanitizedEstimate === null ? true : nextCompleted >= sanitizedEstimate
+            if (shouldComplete) {
+              toggleTaskComplete(activeTaskId)
+            }
+          }
+        }
+
         setIsBreak(true)
         const isLongBreak = currentSession % settings.sessionsUntilLongBreak === 0
         setTimeLeft((isLongBreak ? settings.longBreak : settings.shortBreak) * 60)
@@ -78,9 +199,27 @@ export default function PomodoroApp() {
         clearInterval(intervalRef.current)
       }
     }
-  }, [isActive, timeLeft, isBreak, settings, currentSession])
+  }, [
+    activeTask,
+    activeTaskId,
+    incrementPomodoros,
+    isActive,
+    isBreak,
+    settings,
+    currentSession,
+    timeLeft,
+    toggleTaskComplete,
+  ])
 
-  const toggleTimer = () => {
+  const toggleTimer = (): void => {
+    if (!isActive) {
+      if (activeTaskId === null || activeTask === null || activeTask.isCompleted) {
+        setStartWarning("Select a task to focus on before starting the timer.")
+        return
+      }
+      setStartWarning(null)
+    }
+
     const next = !isActive
     setIsActive(next)
     // Tie audio playback to timer control
@@ -91,19 +230,72 @@ export default function PomodoroApp() {
     }
   }
 
-  const resetTimer = () => {
+  const resetTimer = (): void => {
     setIsActive(false)
     setIsBreak(false)
     setTimeLeft(settings.workTime * 60)
     setCurrentSession(1)
+    setStartWarning(null)
+    pause()
   }
 
-  const handleCloseIntroduction = () => {
+  const handleCloseIntroduction = (): void => {
     setShowIntroduction(false)
     if (isClient) {
       localStorage.setItem('pomopulse-intro-seen', 'true')
     }
   }
+
+  const handleAddTask = useCallback(
+    (label: string): void => {
+      addTask(label)
+    },
+    [addTask],
+  )
+
+  const handleEditTask = useCallback(
+    (taskId: string, nextLabel: string): void => {
+      editTaskLabel(taskId, nextLabel)
+    },
+    [editTaskLabel],
+  )
+
+  const handleToggleTask = useCallback(
+    (taskId: string): void => {
+      toggleTaskComplete(taskId)
+    },
+    [toggleTaskComplete],
+  )
+
+  const handleDeleteTask = useCallback(
+    (taskId: string): void => {
+      deleteTask(taskId)
+    },
+    [deleteTask],
+  )
+
+  const handleReorderTask = useCallback(
+    (startIndex: number, endIndex: number): void => {
+      reorderTasks(startIndex, endIndex)
+    },
+    [reorderTasks],
+  )
+
+  const handleSelectActiveTask = useCallback(
+    (taskId: string): void => {
+      const candidate = tasks.find((task: Task) => task.id === taskId)
+      if (candidate === undefined) {
+        return
+      }
+      if (candidate.isCompleted) {
+        setStartWarning("Mark the task as incomplete before focusing on it.")
+        return
+      }
+      setActiveTaskId(candidate.id)
+      setStartWarning(null)
+    },
+    [tasks],
+  )
 
   const totalTime = isBreak
     ? (currentSession % settings.sessionsUntilLongBreak === 0 ? settings.longBreak : settings.shortBreak) * 60
@@ -121,8 +313,9 @@ export default function PomodoroApp() {
       </div>
 
       <div className="relative z-10 min-h-screen flex items-center justify-center p-3">
-        <div className="p-6 rounded-2xl max-w-sm w-full bg-transparent">
-          <div className="text-center space-y-6">
+        <div className="flex w-full max-w-5xl flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="p-6 rounded-2xl w-full max-w-sm bg-transparent">
+            <div className="text-center space-y-6">
             {/* Timer Circle */}
             <div className="relative flex items-center justify-center">
               <CircularProgress progress={progress} size={240} strokeWidth={6} isActive={isActive} />
@@ -132,22 +325,30 @@ export default function PomodoroApp() {
                   isActive={isActive}
                   title={isBreak ? "Break Time" : "Focus"}
                   subtitle={
-                    <div className="flex justify-center gap-2" role="progressbar" aria-label="Session progress">
-                      {Array.from(
-                        { length: settings.sessionsUntilLongBreak },
-                        (_: unknown, i: number) => (
-                          <div
-                            key={i}
-                            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                              i < currentSession - 1
-                                ? "bg-white/80 shadow-sm scale-110"
-                                : i === currentSession - 1 && !isBreak
-                                  ? "bg-white/80 animate-pulse shadow-sm scale-110"
-                                  : "bg-white/20"
-                            }`}
-                          />
-                        ),
-                      )}
+                    <div className="flex flex-col items-center gap-2" aria-live="polite">
+                      <div className="flex justify-center gap-2" role="progressbar" aria-label="Session progress">
+                        {Array.from(
+                          { length: settings.sessionsUntilLongBreak },
+                          (_: unknown, i: number) => (
+                            <div
+                              key={i}
+                              className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                                i < currentSession - 1
+                                  ? "bg-white/80 shadow-sm scale-110"
+                                  : i === currentSession - 1 && !isBreak
+                                    ? "bg-white/80 animate-pulse shadow-sm scale-110"
+                                    : "bg-white/20"
+                              }`}
+                            />
+                          ),
+                        )}
+                      </div>
+                      <div className="text-xs text-white/80">
+                        {activeTask !== null ? `Working on: ${activeTask.label}` : "Select a task to begin"}
+                      </div>
+                      {activeTaskProgressSummary !== null ? (
+                        <div className="text-[11px] text-white/60">{activeTaskProgressSummary}</div>
+                      ) : null}
                     </div>
                   }
                 />
@@ -186,6 +387,15 @@ export default function PomodoroApp() {
                   <Settings className="w-4 h-4" />
                 </Button>
               </div>
+              {startWarning !== null ? (
+                <div
+                  className="rounded-full border border-amber-400/30 bg-amber-500/15 px-3 py-1 text-xs text-amber-100 shadow-sm"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {startWarning}
+                </div>
+              ) : null}
               <div className="inline-flex items-stretch text-white border border-white/20 rounded-md bg-black/20 backdrop-blur-sm shadow-md overflow-hidden">
                 <button
                   type="button"
@@ -241,6 +451,20 @@ export default function PomodoroApp() {
             </div>
 
             
+          </div>
+          <div className="w-full flex-1">
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-6 backdrop-blur-sm">
+              <TaskList
+                tasks={tasks}
+                activeTaskId={activeTaskId}
+                onAdd={handleAddTask}
+                onEditLabel={handleEditTask}
+                onToggleComplete={handleToggleTask}
+                onDelete={handleDeleteTask}
+                onReorder={handleReorderTask}
+                onSelectActiveTask={handleSelectActiveTask}
+              />
+            </div>
           </div>
         </div>
       </div>
