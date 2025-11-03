@@ -6,9 +6,8 @@ import './globals.css'
 const workSans = Work_Sans({ subsets: ['latin'], variable: '--font-sans', display: 'swap' })
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'POMOPULSE - Pomodoro Timer with Binaural Beats',
+  description: 'A modern, immersive Pomodoro timer application that combines the classic productivity technique with scientifically-backed binaural beats and stunning visual animations to help users maintain focus and prevent burnout.',
 }
 
 export default function RootLayout({

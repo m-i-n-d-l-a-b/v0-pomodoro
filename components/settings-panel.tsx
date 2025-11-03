@@ -14,7 +14,7 @@ interface SettingsPanelProps {
     longBreak: number
     sessionsUntilLongBreak: number
   }
-  onSettingsChange: (settings: any) => void
+  onSettingsChange: (settings: SettingsPanelProps['settings']) => void
   onReset: () => void
 }
 

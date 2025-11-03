@@ -114,7 +114,6 @@ v0-pomodoro/
 │   ├── dynamic-background.tsx   # Canvas animation system
 │   ├── introduction-popup.tsx   # First-time user guide
 │   ├── settings-panel.tsx        # Configuration interface
-│   ├── theme-provider.tsx       # Theme context provider
 │   └── timer-display.tsx        # Time display component
 ├── hooks/
 │   └── useBinauralBeats.ts  # Custom hook for audio management

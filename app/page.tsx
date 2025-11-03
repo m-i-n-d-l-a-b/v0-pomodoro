@@ -2,14 +2,13 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Play, Pause, RotateCcw, Settings } from "lucide-react"
+import { Play, Pause, RotateCcw, Settings, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react"
 import { DynamicBackground } from "@/components/dynamic-background"
 import { CircularProgress } from "@/components/circular-progress"
 import { TimerDisplay } from "@/components/timer-display"
 import { SettingsPanel } from "@/components/settings-panel"
 import { IntroductionPopup } from "@/components/introduction-popup"
 import { useBinauralBeats } from "@/hooks/useBinauralBeats"
-import { Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react"
 import { TRACKS } from "@/lib/audio-engine"
 
 export default function PomodoroApp() {
@@ -239,8 +238,6 @@ export default function PomodoroApp() {
                 </button>
               </div>
             </div>
-
-            
           </div>
         </div>
       </div>
