@@ -92,8 +92,9 @@ Performance-optimized particle animation engine:
 - **Responsive Design:** Mobile-first approach with breakpoint optimizations
 
 ## 📸 Screenshots
+![pomopulse_waves](https://github.com/user-attachments/assets/4cfece2c-21f0-4c11-a8d6-040c755c485d)
 
-
+![pomopulse_settings](https://github.com/user-attachments/assets/2d485566-4f45-4209-86af-e5c84f7f10fd)
 
 ## 🚀 Live Demo
 
